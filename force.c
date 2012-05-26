@@ -60,7 +60,7 @@ void count(char *word)
 
 	if(loc != -1) // Already in table
 	{
-		counted.pairs[i]->count++;
+		counted.pairs[loc]->count++;
 
 		free(word);
 	}

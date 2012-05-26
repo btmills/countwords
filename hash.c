@@ -50,10 +50,15 @@ Coord *lookup(char *word)
 	Coord *result;
 
 	result = malloc(sizeof(Coord)); // Create new Coord
+	if(result == NULL)
+	{
+		printf("Out of memory.\n");
+		exit(1);
+	}
 	result->bin = hash(word) % HASHBINS;
 	result->index = -1;
 
-	if(table[result->bin] != NULL)
+	if(table[result->bin])
 	{
 		for(i = 0; i < table[result->bin]->len; i++)
 		{
@@ -78,7 +83,7 @@ void count(char *word)
 
 	if(coord->index != -1) // Already in table
 	{
-		table[coord->bin]->pairs[i]->count++;
+		table[coord->bin]->pairs[coord->index]->count++;
 
 		free(word);
 	}
@@ -92,8 +97,9 @@ void count(char *word)
 
 		if(table[coord->bin] == NULL)
 		{
-			//printf("Creating PairList in table at index %d\n", coord->bin);
 			table[coord->bin] = (PairList*)malloc(sizeof(PairList));
+			table[coord->bin]->len = 0;
+			table[coord->bin]->size = 0;
 		}
 
 		table[coord->bin]->len++;
@@ -114,7 +120,7 @@ void count(char *word)
 	//words++;
 }
 
-bool isWordCharacter(int ch)
+inline bool isWordCharacter(int ch)
 {
 	if(('a' <= ch && ch <= 'z')
 		|| ('A' <= ch && ch <= 'Z')
@@ -129,6 +135,11 @@ int main()
 	char* word;
 
 	table = malloc(HASHBINS * sizeof(PairList*));
+	if(table == NULL)
+	{
+		printf("Could not allocate memory for hash table.\n");
+		exit(1);
+	}
 
 	ch = getchar();
 	while(ch != EOF)
@@ -158,7 +169,7 @@ int main()
 				count(word);
 
 				// Prepare for next word
-				//free(word);
+				//free(word); // word is freed by count() if not needed
 				//word = NULL;
 				size = 0;
 				len = 0;
@@ -182,7 +193,7 @@ int main()
 		//len = 0;
 	}
 
-	//printf("%d unique words table[coord->bin]:\n", table[coord->bin].len);
+	// Print words
 	{
 		int i, j;
 		for(i = 0; i < HASHBINS; i++)
@@ -204,7 +215,7 @@ int main()
 	}
 
 	//printf("A total of %ld string comparisons took place.\n", comparisons);
-	//printf("%ld words were table[coord->bin].\n", words);
+	//printf("%ld words were counted.\n", words);
 
 	free(table);
 
