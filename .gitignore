@@ -1,0 +1,5 @@
+*.o
+*.bat
+*.exe
+old
+*.DS_Store

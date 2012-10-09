@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Prime number. Works well empirically.
 #define HASHBINS 9973
 
 #define bool char
@@ -27,10 +28,11 @@ typedef struct
 	int index;
 } Coord;
 
-PairList **table;
+PairList *table[HASHBINS];
 
-//long comparisons;
-//long words;
+/// Interesting statistics
+long comparisons;
+long words;
 
 // djb2 hash algorithm
 unsigned long hash(char *str)
@@ -44,28 +46,27 @@ unsigned long hash(char *str)
 	return hash;
 }
 
-Coord *lookup(char *word)
+Coord lookup(char* word)
 {
 	int i;
-	Coord *result;
+	Coord result;
+	unsigned long hashVal;
 
-	result = malloc(sizeof(Coord)); // Create new Coord
-	if(result == NULL)
-	{
-		printf("Out of memory.\n");
-		exit(1);
-	}
-	result->bin = hash(word) % HASHBINS;
-	result->index = -1;
+	hashVal = hash(word);
 
-	if(table[result->bin])
+	result.bin = hashVal % HASHBINS;
+	result.index = -1; // Initial value of undefined
+
+	if(table[result.bin])
 	{
-		for(i = 0; i < table[result->bin]->len; i++)
+		for(i = 0; i < table[result.bin]->len; i++)
 		{
-			//comparisons++;
-			if(strcmp(word, table[result->bin]->pairs[i]->word) == 0)
+			omparisons++; // Uncomment for performance tuning
+			/* Considered storing and comparing hash values (unmodded) but no
+			   performance gain was apparent given large enough HASHBINS */
+			if(strcmp(word, table[result.bin]->pairs[i]->word) == 0)
 			{
-				result->index = i;
+				result.index = i;
 				break;
 			}
 		}
@@ -74,53 +75,54 @@ Coord *lookup(char *word)
 	return result;
 }
 
-void count(char *word)
+void count(char* word)
 {
 	int i;
-	Coord *coord;
+	Coord addr;
 
-	coord = lookup(word);
+	addr = lookup(word);
 
-	if(coord->index != -1) // Already in table
+	if(addr.index != -1) // Already in table
 	{
-		table[coord->bin]->pairs[coord->index]->count++;
-
-		free(word);
+		table[addr.bin]->pairs[addr.index]->count++;
 	}
 	else // Was not found
 	{
-		Pair *p;
-
-		p = (Pair*)malloc(sizeof(Pair));
-		p->word = word;
+		// Create pair and copy word
+		Pair *p = malloc(sizeof(Pair));
+		p->word = malloc((strlen(word) + 1) * sizeof(char));
+		strcpy(p->word, word);
 		p->count = 1;
 
-		if(table[coord->bin] == NULL)
+		// Create a hash table row if it does not exist
+		if(table[addr.bin] == NULL)
 		{
-			table[coord->bin] = (PairList*)malloc(sizeof(PairList));
-			table[coord->bin]->len = 0;
-			table[coord->bin]->size = 0;
+			table[addr.bin] = (PairList*)malloc(sizeof(PairList));
+			table[addr.bin]->len = 0;
+			table[addr.bin]->size = 0;
 		}
 
-		table[coord->bin]->len++;
+		// Add word to hash table row
+		table[addr.bin]->len++;
 
-		if(table[coord->bin]->size == 0)
+		if(table[addr.bin]->size == 0)
 		{
-			table[coord->bin]->size = 32;
-			table[coord->bin]->pairs = malloc(table[coord->bin]->size * sizeof(Pair*));
+			table[addr.bin]->size = 2;
+			table[addr.bin]->pairs = malloc(table[addr.bin]->size * sizeof(Pair*));
 		}
-		else if(table[coord->bin]->len > table[coord->bin]->size)
+		else if(table[addr.bin]->len > table[addr.bin]->size)
 		{
-			table[coord->bin]->size *= 2;
-			table[coord->bin]->pairs = realloc(table[coord->bin]->pairs, table[coord->bin]->size * sizeof(Pair*));
+			table[addr.bin]->size *= 2;
+			table[addr.bin]->pairs = realloc(table[addr.bin]->pairs, table[addr.bin]->size * sizeof(Pair*));
 		}
 
-		table[coord->bin]->pairs[table[coord->bin]->len - 1] = p;
+		table[addr.bin]->pairs[table[addr.bin]->len - 1] = p;
 	}
-	//words++;
+
+	words++;
 }
 
-inline bool isWordCharacter(int ch)
+inline bool isWordCharacter(char ch)
 {
 	if(('a' <= ch && ch <= 'z')
 		|| ('A' <= ch && ch <= 'Z')
@@ -131,15 +133,9 @@ inline bool isWordCharacter(int ch)
 
 int main()
 {
-	int ch, size, len;
+	char ch;
+	int size = 0, len = 0;
 	char* word;
-
-	table = malloc(HASHBINS * sizeof(PairList*));
-	if(table == NULL)
-	{
-		printf("Could not allocate memory for hash table.\n");
-		exit(1);
-	}
 
 	ch = getchar();
 	while(ch != EOF)
@@ -150,7 +146,7 @@ int main()
 
 			if(size == 0) // Beginning of new word
 			{
-				size = 4;
+				size = 32;
 				word = malloc(size * sizeof(char));
 			}
 			else if(len >= size) // Need to allocate more memory for word
@@ -168,11 +164,7 @@ int main()
 				word[len] = '\0'; // Add null-terminator
 				count(word);
 
-				// Prepare for next word
-				//free(word); // word is freed by count() if not needed
-				//word = NULL;
-				size = 0;
-				len = 0;
+				len = 0; // Prepare for next word
 			}
 			// Else ignore ch
 		}
@@ -185,13 +177,9 @@ int main()
 	{
 		word[len] = '\0'; // Add null-terminator
 		count(word);
-
-		// Prepare for next word
-		//free(word);
-		//word = NULL;
-		//size = 0;
-		//len = 0;
 	}
+
+	free(word);
 
 	// Print words
 	{
@@ -202,7 +190,7 @@ int main()
 			{
 				for(j = 0; j < table[i]->len; j++)
 				{
-					printf("(\"%s\", %d)\n", table[i]->pairs[j]->word, table[i]->pairs[j]->count);
+					//printf("(\"%s\", %d)\n", table[i]->pairs[j]->word, table[i]->pairs[j]->count);
 
 					// Clean up
 					free(table[i]->pairs[j]->word);
@@ -214,10 +202,8 @@ int main()
 		}
 	}
 
-	//printf("A total of %ld string comparisons took place.\n", comparisons);
-	//printf("%ld words were counted.\n", words);
-
-	free(table);
+	printf("A total of %ld string comparisons took place.\n", comparisons);
+	printf("%ld words were counted.\n", words);
 
 	return 0;
 }
